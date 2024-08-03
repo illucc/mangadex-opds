@@ -5,7 +5,6 @@ import (
 	"golang.org/x/time/rate"
 	"log/slog"
 	"net/url"
-	"sync"
 	"time"
 
 	"github.com/rushsteve1/mangadex-opds/shared"
@@ -43,13 +42,13 @@ func FetchChapter(
 	}
 
 	data, err := shared.QueryAPI[Data[Chapter]](ctx, queryPath, queryParams, nil)
+	if err != nil {
+		return data.Data, err
+	}
 
 	data.Data.FullTitle()
 	data.Data.Manga()
-	_, err2 := data.Data.FetchImageURLs(ctx)
-	if err2 != nil {
-		err = err2
-	}
+	_, err = data.Data.FetchImageURLs(ctx)
 
 	return data.Data, err
 }
@@ -109,30 +108,18 @@ func (c *Chapter) FetchImageURLs(ctx context.Context) (imgUrls []*url.URL, err e
 	// Pre-allocate the slice
 	imgUrls = make([]*url.URL, len(imgStrs), len(imgStrs))
 
-	var wg sync.WaitGroup
-	wg.Add(len(imgStrs))
-
 	for i, imgStr := range imgStrs {
-		go func(i int, imgStr string) {
-			defer wg.Done()
-			imgUrl, err2 := url.Parse(resp.BaseUrl)
-			if err2 != nil {
-				err = err2
-			}
+		imgUrl, err := url.Parse(resp.BaseUrl)
+		if err != nil {
+			return nil, err
+		}
 
-			imgUrl.Path, err2 = url.JoinPath(dName, resp.Chapter.Hash, imgStr)
-			if err2 != nil {
-				err = err2
-			}
+		imgUrl.Path, err = url.JoinPath(dName, resp.Chapter.Hash, imgStr)
+		if err != nil {
+			return nil, err
+		}
 
-			imgUrls[i] = imgUrl
-		}(i, imgStr)
-	}
-
-	wg.Wait()
-
-	if err != nil {
-		return nil, err
+		imgUrls[i] = imgUrl
 	}
 
 	slog.DebugContext(ctx, "fetched image urls", "count", len(imgUrls))

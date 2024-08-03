@@ -108,41 +108,50 @@ func QueryAPI[T any](
 
 	entry, err := cache.Get(queryUrl.String())
 	if err != nil {
-		err = QueryAPILimiter.Wait(ctx)
-		if err != nil {
-			return out, err
-		}
-		if limiter != nil {
-			err = limiter.Wait(ctx)
+		for i := 0; i < 3 && err != nil; i++ {
+			err = QueryAPILimiter.Wait(ctx)
 			if err != nil {
-				return out, err
+				continue
+			}
+			if limiter != nil {
+				err = limiter.Wait(ctx)
+				if err != nil {
+					continue
+				}
+			}
+
+			slog.InfoContext(ctx, "querying API", "url", queryUrl.String())
+
+			req, err2 := makeRequest(ctx, &queryUrl)
+			if err2 != nil {
+				err2 = err
+				continue
+			}
+			req.Header.Set("Accept", "application/json")
+
+			res, err2 := http.DefaultClient.Do(req)
+			if err2 != nil {
+				err2 = err
+				continue
+			}
+			defer res.Body.Close()
+
+			if res.StatusCode != http.StatusOK {
+				err = fmt.Errorf("upstream error: %s", res.Status)
+				time.After(1 * time.Minute)
+				continue
+			}
+
+			entry, err = io.ReadAll(res.Body)
+			if err != nil {
+				continue
+			}
+
+			err = cache.Set(queryUrl.String(), entry)
+			if err != nil {
+				continue
 			}
 		}
-
-		slog.InfoContext(ctx, "querying API", "url", queryUrl.String())
-
-		req, err := makeRequest(ctx, &queryUrl)
-		if err != nil {
-			return out, err
-		}
-		req.Header.Set("Accept", "application/json")
-
-		res, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return out, err
-		}
-		defer res.Body.Close()
-
-		if res.StatusCode != http.StatusOK {
-			return out, fmt.Errorf("upstream error: %s", res.Status)
-		}
-
-		entry, err = io.ReadAll(res.Body)
-		if err != nil {
-			return out, err
-		}
-
-		err = cache.Set(queryUrl.String(), entry)
 		if err != nil {
 			return out, err
 		}

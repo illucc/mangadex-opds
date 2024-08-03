@@ -2,11 +2,9 @@ package models
 
 import (
 	"context"
+	"github.com/rushsteve1/mangadex-opds/shared"
 	"log/slog"
 	"net/url"
-	"sync"
-
-	"github.com/rushsteve1/mangadex-opds/shared"
 
 	"github.com/google/uuid"
 )
@@ -23,6 +21,9 @@ func FetchManga(ctx context.Context, id uuid.UUID, queryParams url.Values) (m Ma
 	queryParams = shared.WithDefaultParams(queryParams)
 
 	data, err := shared.QueryAPI[Data[Manga]](ctx, queryPath, queryParams, nil)
+	if err != nil {
+		return m, err
+	}
 
 	m = data.Data
 	m.mergeTitles()
@@ -36,6 +37,9 @@ func SearchManga(ctx context.Context, queryParams url.Values) (ms []Manga, err e
 	queryParams = shared.WithDefaultParams(queryParams)
 
 	data, err := shared.QueryAPI[Data[[]Manga]](ctx, "manga", queryParams, nil)
+	if err != nil {
+		return nil, err
+	}
 
 	for i := range data.Data {
 		data.Data[i].RelData()
@@ -64,9 +68,6 @@ func (m Manga) Feed(ctx context.Context, queryParams url.Values) (cs []Chapter, 
 
 	data, err := shared.QueryAPI[Data[[]Chapter]](ctx, queryPath, queryParams, nil)
 
-	var wg sync.WaitGroup
-	wg.Add(len(data.Data))
-
 	for i := range data.Data {
 		go func(i int) {
 			data.Data[i].manga = &m
@@ -77,8 +78,6 @@ func (m Manga) Feed(ctx context.Context, queryParams url.Values) (cs []Chapter, 
 			}
 		}(i)
 	}
-
-	wg.Wait()
 
 	return data.Data, err
 }
