@@ -69,14 +69,8 @@ func (m Manga) Feed(ctx context.Context, queryParams url.Values) (cs []Chapter, 
 	data, err := shared.QueryAPI[Data[[]Chapter]](ctx, queryPath, queryParams, nil)
 
 	for i := range data.Data {
-		go func(i int) {
-			data.Data[i].manga = &m
-			data.Data[i].FullTitle()
-			_, err2 := data.Data[i].FetchImageURLs(ctx)
-			if err2 != nil {
-				err = err2
-			}
-		}(i)
+		data.Data[i].manga = &m
+		data.Data[i].FullTitle()
 	}
 
 	return data.Data, err
