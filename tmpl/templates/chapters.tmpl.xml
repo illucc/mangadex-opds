@@ -39,10 +39,7 @@
         </author>
         {{ end }}
 
-        {{/*
-        TODO implement epub
         <link href="{{ html .URL }}/epub" type="{{ mime ".epub" }}" rel="http://opds-spec.org/acquisition" />
-        */}}
         <link href="{{ html .URL }}/cbz" type="{{ mime ".cbz" }}" rel="http://opds-spec.org/acquisition" />
         <link href="{{ html .URL }}?page={pageNumber}" type="image/png" rel="http://vaemendis.net/opds-pse/stream" pse:count="{{ html .Attributes.Pages }}" />
 

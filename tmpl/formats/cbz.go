@@ -93,7 +93,10 @@ func WriteCBZ(ctx context.Context, c *models.Chapter, w io.Writer) (err error) {
 			return err
 		}
 
-		io.Copy(w, &img.Data)
+		_, err = io.Copy(w, &img.Data)
+		if err != nil {
+			return err
+		}
 	}
 
 	err = <-doneChan

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package version="2.0" unique-identifier="BookId" xmlns="http://www.idpf.org/2007/opf">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+    <dc:language>{{ html .Attributes.TranslatedLanguage }}</dc:language>
+    <dc:title>{{ html .FullTitle }}</dc:title>
+    {{ range .Manga.RelData.Authors }}
+    <dc:creator>{{ html .Name }}</dc:creator>
+    {{ end }}
+    <dc:date xmlns:opf="http://www.idpf.org/2007/opf" opf:event="modification">{{ datef2 .Attributes.UpdatedAt }}</dc:date>
+    <dc:identifier opf:scheme="UUID" id="BookId">urn:uuid:{{ html .ID }}</dc:identifier>
+  </metadata>
+  <manifest>
+    <item id="ncx" href="toc.ncx" media-type="{{ mime ".ncx" }}"/>
+    <item id="cover.{{ ext .Manga.RelData.CoverURL }}" href="Images/cover{{ ext .Manga.RelData.CoverURL }}" media-type="{{ mime .Manga.RelData.CoverURL }}"/>
+    <item id="cover.xhtml" href="Text/cover.xhtml" media-type="{{ mime ".xhtml" }}"/>
+    {{ range $index, $url := .ImgURLs }}
+    <item id="{{ base $url.Path }}" href="Images/{{ base $url.Path }}" media-type="{{ mime $url.Path }}"/>
+    {{ end }}
+    <item id="epub.xhtml" href="Text/epub.xhtml" media-type="{{ mime ".xhtml" }}"/>
+  </manifest>
+  <spine toc="ncx">
+    <itemref idref="epub.xhtml"/>
+  </spine>
+</package>

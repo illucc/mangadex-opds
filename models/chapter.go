@@ -103,3 +103,7 @@ func (c *Chapter) Manga() *Manga {
 
 	return nil
 }
+
+func (c *Chapter) ImgURLs() []*url.URL {
+	return c.imgUrls
+}
