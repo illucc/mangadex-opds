@@ -8,14 +8,14 @@
     <title>{{ html .Manga.TrTitle }}</title>
     <updated>{{ .Manga.Attributes.UpdatedAt | datef }}</updated>
     <author>
-        <name>mangadex-opds {{ .Version }}</name>
+        <name>mangadex-opds {{ html .Version }}</name>
         <uri>https://github.com/rushsteve1/mangadex-opds</uri>
     </author>
 
-    <link rel="self" href="{{ .Manga.URL }}" type="application/atom+xml;profile=opds-catalog;kind=acquisition"/>
-    <link rel="start" href="{{ .Host }}/catalog" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>
-    <link rel="up" href="{{ .Host }}/catalog" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>
-    <link rel="search" href="{{ .Host }}/search" type="application/opensearchdescription+xml"/>
+    <link rel="self" href="{{ html .Manga.URL }}" type="application/atom+xml;profile=opds-catalog;kind=acquisition"/>
+    <link rel="start" href="{{ html .Host }}/catalog" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>
+    <link rel="up" href="{{ html .Host }}/catalog" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>
+    <link rel="search" href="{{ html .Host }}/search" type="application/opensearchdescription+xml"/>
 
     {{/*
     <content type="text">{{ html .Manga.TrDesc }}</content>
@@ -34,7 +34,7 @@
         <author>
             <name>{{ html .Name }}</name>
         {{- if ne .URI "" -}}
-            <uri>{{ .URI }}</uri>
+            <uri>{{ html .URI }}</uri>
         {{- end -}}
         </author>
         {{ end }}
