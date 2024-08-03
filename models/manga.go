@@ -97,6 +97,8 @@ func (m *Manga) RelData() (rd *RelData) {
 		return m.relData
 	}
 
+	rd = new(RelData)
+
 	for _, rel := range m.Relationships {
 		switch rel.Type {
 		case "author":

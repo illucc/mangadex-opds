@@ -25,6 +25,7 @@ func FetchManga(ctx context.Context, id uuid.UUID, queryParams url.Values) (m Ma
 
 	m = data.Data
 	m.mergeTitles()
+	m.RelData()
 
 	return m, err
 }
@@ -34,6 +35,10 @@ func SearchManga(ctx context.Context, queryParams url.Values) (ms []Manga, err e
 	queryParams = shared.WithDefaultParams(queryParams)
 
 	data, err := shared.QueryAPI[Data[[]Manga]](ctx, "manga", queryParams)
+
+	for i := range data.Data {
+		data.Data[i].RelData()
+	}
 
 	return data.Data, err
 }
@@ -57,6 +62,16 @@ func (m Manga) Feed(ctx context.Context, queryParams url.Values) (cs []Chapter, 
 	queryParams.Add("includeEmptyPages", "0")
 
 	data, err := shared.QueryAPI[Data[[]Chapter]](ctx, queryPath, queryParams)
+
+	for i := range data.Data {
+		data.Data[i].FullTitle()
+		data.Data[i].Manga()
+		_, err2 := data.Data[i].FetchImageURLs(ctx)
+		if err2 != nil {
+			err = err2
+			break
+		}
+	}
 
 	return data.Data, err
 }
