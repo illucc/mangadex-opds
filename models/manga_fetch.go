@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/url"
+	"sync"
 
 	"github.com/rushsteve1/mangadex-opds/shared"
 
@@ -21,7 +22,7 @@ func FetchManga(ctx context.Context, id uuid.UUID, queryParams url.Values) (m Ma
 
 	queryParams = shared.WithDefaultParams(queryParams)
 
-	data, err := shared.QueryAPI[Data[Manga]](ctx, queryPath, queryParams)
+	data, err := shared.QueryAPI[Data[Manga]](ctx, queryPath, queryParams, nil)
 
 	m = data.Data
 	m.mergeTitles()
@@ -34,7 +35,7 @@ func FetchManga(ctx context.Context, id uuid.UUID, queryParams url.Values) (m Ma
 func SearchManga(ctx context.Context, queryParams url.Values) (ms []Manga, err error) {
 	queryParams = shared.WithDefaultParams(queryParams)
 
-	data, err := shared.QueryAPI[Data[[]Manga]](ctx, "manga", queryParams)
+	data, err := shared.QueryAPI[Data[[]Manga]](ctx, "manga", queryParams, nil)
 
 	for i := range data.Data {
 		data.Data[i].RelData()
@@ -61,17 +62,23 @@ func (m Manga) Feed(ctx context.Context, queryParams url.Values) (cs []Chapter, 
 	queryParams.Add("translatedLanguage[]", shared.GlobalOptions.Language)
 	queryParams.Add("includeEmptyPages", "0")
 
-	data, err := shared.QueryAPI[Data[[]Chapter]](ctx, queryPath, queryParams)
+	data, err := shared.QueryAPI[Data[[]Chapter]](ctx, queryPath, queryParams, nil)
+
+	var wg sync.WaitGroup
+	wg.Add(len(data.Data))
 
 	for i := range data.Data {
-		data.Data[i].FullTitle()
-		data.Data[i].Manga()
-		_, err2 := data.Data[i].FetchImageURLs(ctx)
-		if err2 != nil {
-			err = err2
-			break
-		}
+		go func(i int) {
+			data.Data[i].manga = &m
+			data.Data[i].FullTitle()
+			_, err2 := data.Data[i].FetchImageURLs(ctx)
+			if err2 != nil {
+				err = err2
+			}
+		}(i)
 	}
+
+	wg.Wait()
 
 	return data.Data, err
 }

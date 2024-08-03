@@ -2,8 +2,11 @@ package models
 
 import (
 	"context"
+	"golang.org/x/time/rate"
 	"log/slog"
 	"net/url"
+	"sync"
+	"time"
 
 	"github.com/rushsteve1/mangadex-opds/shared"
 
@@ -39,7 +42,7 @@ func FetchChapter(
 		queryParams[k] = v
 	}
 
-	data, err := shared.QueryAPI[Data[Chapter]](ctx, queryPath, queryParams)
+	data, err := shared.QueryAPI[Data[Chapter]](ctx, queryPath, queryParams, nil)
 
 	data.Data.FullTitle()
 	data.Data.Manga()
@@ -61,6 +64,8 @@ type imageUrlResponse struct {
 	} `json:"chapter"`
 }
 
+var FetchImageURLsLimiter = rate.NewLimiter(rate.Every(time.Minute)/40, 40)
+
 // FetchImageURLs gets the list of image URLs that correspond to this [Chapter].
 // These URLs are not part of the normal MangaDex API, and are usually fetched
 // from  the Mangadex@Home servers via mangadex.network.
@@ -81,7 +86,7 @@ func (c *Chapter) FetchImageURLs(ctx context.Context) (imgUrls []*url.URL, err e
 		return nil, err
 	}
 
-	resp, err := shared.QueryAPI[imageUrlResponse](ctx, queryPath, nil)
+	resp, err := shared.QueryAPI[imageUrlResponse](ctx, queryPath, nil, FetchImageURLsLimiter)
 	if err != nil {
 		return nil, err
 	}
@@ -102,20 +107,32 @@ func (c *Chapter) FetchImageURLs(ctx context.Context) (imgUrls []*url.URL, err e
 	}
 
 	// Pre-allocate the slice
-	imgUrls = make([]*url.URL, 0, len(imgStrs))
+	imgUrls = make([]*url.URL, len(imgStrs), len(imgStrs))
 
-	for _, imgStr := range imgStrs {
-		imgUrl, err := url.Parse(resp.BaseUrl)
-		if err != nil {
-			return nil, err
-		}
+	var wg sync.WaitGroup
+	wg.Add(len(imgStrs))
 
-		imgUrl.Path, err = url.JoinPath(dName, resp.Chapter.Hash, imgStr)
-		if err != nil {
-			return nil, err
-		}
+	for i, imgStr := range imgStrs {
+		go func(i int, imgStr string) {
+			defer wg.Done()
+			imgUrl, err2 := url.Parse(resp.BaseUrl)
+			if err2 != nil {
+				err = err2
+			}
 
-		imgUrls = append(imgUrls, imgUrl)
+			imgUrl.Path, err2 = url.JoinPath(dName, resp.Chapter.Hash, imgStr)
+			if err2 != nil {
+				err = err2
+			}
+
+			imgUrls[i] = imgUrl
+		}(i, imgStr)
+	}
+
+	wg.Wait()
+
+	if err != nil {
+		return nil, err
 	}
 
 	slog.DebugContext(ctx, "fetched image urls", "count", len(imgUrls))

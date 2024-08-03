@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/allegro/bigcache/v3"
+	"golang.org/x/time/rate"
 	"io"
 	"log/slog"
 	"mime"
@@ -86,11 +87,14 @@ func UserAgent() string {
 	return fmt.Sprintf("%s/%s", path.Base(info.Main.Path), info.Main.Version)
 }
 
+var QueryAPILimiter = rate.NewLimiter(rate.Every(time.Second)/5, 5)
+
 // QueryAPI is used to fetch data from the MangaDex API.
 func QueryAPI[T any](
 	ctx context.Context,
 	queryPath string,
 	queryParams url.Values,
+	limiter *rate.Limiter,
 ) (out T, err error) {
 	var queryUrl url.URL
 	if GlobalOptions.DevApi {
@@ -104,6 +108,17 @@ func QueryAPI[T any](
 
 	entry, err := cache.Get(queryUrl.String())
 	if err != nil {
+		err = QueryAPILimiter.Wait(ctx)
+		if err != nil {
+			return out, err
+		}
+		if limiter != nil {
+			err = limiter.Wait(ctx)
+			if err != nil {
+				return out, err
+			}
+		}
+
 		slog.InfoContext(ctx, "querying API", "url", queryUrl.String())
 
 		req, err := makeRequest(ctx, &queryUrl)
