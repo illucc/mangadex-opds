@@ -1,9 +1,11 @@
 package shared
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/allegro/bigcache/v3"
 	"io"
 	"log/slog"
 	"mime"
@@ -11,6 +13,7 @@ import (
 	"net/url"
 	"path"
 	"runtime/debug"
+	"time"
 )
 
 // APIUrl is the default MangaDex API URL
@@ -30,6 +33,44 @@ var UploadsURL = url.URL{
 	Scheme: "https",
 	Host:   "uploads.mangadex.org",
 }
+
+var cache, _ = bigcache.New(context.Background(), bigcache.Config{
+	// number of shards (must be a power of 2)
+	Shards: 1024,
+
+	// time after which entry can be evicted
+	LifeWindow: 10 * time.Minute,
+
+	// Interval between removing expired entries (clean up).
+	// If set to <= 0 then no action is performed.
+	// Setting to < 1 second is counterproductive — bigcache has a one second resolution.
+	CleanWindow: 5 * time.Minute,
+
+	// rps * lifeWindow, used only in initial memory allocation
+	MaxEntriesInWindow: 1000 * 10 * 60,
+
+	// max entry size in bytes, used only in initial memory allocation
+	MaxEntrySize: 500,
+
+	// prints information about additional memory allocation
+	Verbose: true,
+
+	// cache will not allocate more memory than this limit, value in MB
+	// if value is reached then the oldest entries can be overridden for the new ones
+	// 0 value means no size limit
+	HardMaxCacheSize: 450,
+
+	// callback fired when the oldest entry is removed because of its expiration time or no space left
+	// for the new entry, or because delete was called. A bitmask representing the reason will be returned.
+	// Default value is nil which means no callback and it prevents from unwrapping the oldest entry.
+	OnRemove: nil,
+
+	// OnRemoveWithReason is a callback fired when the oldest entry is removed because of its expiration time or no space left
+	// for the new entry, or because delete was called. A constant representing the reason will be passed through.
+	// Default value is nil which means no callback and it prevents from unwrapping the oldest entry.
+	// Ignored if OnRemove is specified.
+	OnRemoveWithReason: nil,
+})
 
 // UserAgent constructs the `User-Agent` header from the build information.
 func UserAgent() string {
@@ -61,26 +102,39 @@ func QueryAPI[T any](
 	queryUrl.Path = queryPath
 	queryUrl.RawQuery = queryParams.Encode()
 
-	slog.InfoContext(ctx, "querying API", "url", queryUrl.String())
-
-	req, err := makeRequest(ctx, &queryUrl)
+	entry, err := cache.Get(queryUrl.String())
 	if err != nil {
-		return out, err
+		slog.InfoContext(ctx, "querying API", "url", queryUrl.String())
+
+		req, err := makeRequest(ctx, &queryUrl)
+		if err != nil {
+			return out, err
+		}
+		req.Header.Set("Accept", "application/json")
+
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return out, err
+		}
+		defer res.Body.Close()
+
+		if res.StatusCode != http.StatusOK {
+			return out, fmt.Errorf("upstream error: %s", res.Status)
+		}
+
+		entry, err = io.ReadAll(res.Body)
+		if err != nil {
+			return out, err
+		}
+
+		err = cache.Set(queryUrl.String(), entry)
+		if err != nil {
+			return out, err
+		}
+	} else {
+		slog.InfoContext(ctx, "loading cache of API", "url", queryUrl.String())
 	}
-	req.Header.Set("Accept", "application/json")
-
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return out, err
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		return out, fmt.Errorf("upstream error: %s", res.Status)
-	}
-
-	err = json.NewDecoder(res.Body).Decode(&out)
-
+	err = json.NewDecoder(bytes.NewReader(entry)).Decode(&out)
 	return out, err
 }
 
