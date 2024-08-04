@@ -9,7 +9,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"io"
 	"log/slog"
-	"mime"
+	"os"
 	"path"
 
 	"github.com/rushsteve1/mangadex-opds/models"
@@ -24,37 +24,7 @@ func WriteEpub(ctx context.Context, c *models.Chapter, w io.Writer) (err error) 
 		return err
 	}
 
-	w, err = z.Create("mimetype")
-	if err != nil {
-		return err
-	}
-
-	_, err = io.WriteString(w, mime.TypeByExtension(".epub"))
-	if err != nil {
-		return err
-	}
-
-	w, err = z.Create("META-INF/container.xml")
-	if err != nil {
-		return err
-	}
-
-	_, err = io.WriteString(w, `<?xml version="1.0" encoding="UTF-8"?>
-<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
-    <rootfiles>
-        <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
-   </rootfiles>
-</container>`)
-	if err != nil {
-		return err
-	}
-
-	w, err = z.Create("ComicInfo.xml")
-	if err != nil {
-		return err
-	}
-
-	err = tmpl.ComicInfoXML(c, w)
+	err = z.AddFS(os.DirFS("tmpl/formats/epub"))
 	if err != nil {
 		return err
 	}
@@ -64,7 +34,7 @@ func WriteEpub(ctx context.Context, c *models.Chapter, w io.Writer) (err error) 
 		return err
 	}
 
-	w, err = z.Create("OEBPS/content.opf")
+	w, err = z.Create("content.opf")
 	if err != nil {
 		return err
 	}
@@ -74,7 +44,7 @@ func WriteEpub(ctx context.Context, c *models.Chapter, w io.Writer) (err error) 
 		return err
 	}
 
-	w, err = z.Create("OEBPS/toc.ncx")
+	w, err = z.Create("toc.ncx")
 	if err != nil {
 		return err
 	}
@@ -84,17 +54,7 @@ func WriteEpub(ctx context.Context, c *models.Chapter, w io.Writer) (err error) 
 		return err
 	}
 
-	w, err = z.Create("OEBPS/Text/epub.xhtml")
-	if err != nil {
-		return err
-	}
-
-	err = tmpl.EpubXHTML(c, w)
-	if err != nil {
-		return err
-	}
-
-	imgChan := make(chan chapterImage)
+	imgChan := make(chan tmpl.ChapterImage)
 	doneChan := make(chan error)
 
 	// Fetch and add the image files in parallel
@@ -102,10 +62,13 @@ func WriteEpub(ctx context.Context, c *models.Chapter, w io.Writer) (err error) 
 		eg, ctx := errgroup.WithContext(ctx)
 		eg.SetLimit(3)
 
-		for _, img := range imgUrls {
+		for i, img := range imgUrls {
 			eg.Go(func() error {
 				imgName := path.Base(img.String())
-				chImg := chapterImage{Name: imgName}
+				chImg := tmpl.ChapterImage{
+					Name:  imgName,
+					Index: i,
+				}
 
 				err := shared.QueryImage(ctx, img, &chImg.Data)
 				if err != nil {
@@ -127,11 +90,21 @@ func WriteEpub(ctx context.Context, c *models.Chapter, w io.Writer) (err error) 
 	}()
 
 	for img := range imgChan {
+		w, err = z.Create(fmt.Sprintf("%s.xhtml", img.Name))
+		if err != nil {
+			return err
+		}
+
+		err = tmpl.EpubXHTML(&img, w)
+		if err != nil {
+			return err
+		}
+
 		// Images will not be compressed, just stored
 		// This saves a lot of time and performance at the cost of bigger files
 		// But considering MangaDex is fine with hosting those I assume they're already optimized
 		w, err = z.CreateHeader(&zip.FileHeader{
-			Name:   fmt.Sprintf("OEBPS/Images/%s", img.Name),
+			Name:   img.Name,
 			Method: zip.Store,
 		})
 		if err != nil {
