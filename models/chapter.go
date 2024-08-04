@@ -57,8 +57,8 @@ func (c *Chapter) FullTitle() string {
 		title = m.TrTitle()
 	}
 
-	builder.WriteString(c.Attributes.TranslatedLanguage)
-	builder.WriteString(" - ")
+	builder.WriteString(LanguageToFlag[c.Attributes.TranslatedLanguage])
+	builder.WriteString(" ")
 	builder.WriteString(title)
 	builder.WriteString(" - ")
 
