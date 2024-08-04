@@ -12,6 +12,7 @@
     <link rel="self" href="{{ html .Host }}/catalog" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>
     <link rel="start" href="{{ html .Host }}/catalog" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>
     <link rel="search" href="{{ html .Host }}/search" type="application/opensearchdescription+xml"/>
+    <link rel="search" href="{{ html .Host }}/search?title={searchTerms}" type="application/atom+xml" title="MangaDex OPDS"/>
 
     <entry>
         <title>Most Followed</title>
