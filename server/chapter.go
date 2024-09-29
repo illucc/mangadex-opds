@@ -21,7 +21,7 @@ import (
 
 func init() {
 	// I think this will help get around an issue with the mime types
-	mime.AddExtensionType(".cbz", "application/zip")
+	mime.AddExtensionType(".cbz", "application/x-cbz")
 }
 
 func chapterHandler(w http.ResponseWriter, r *http.Request) {
