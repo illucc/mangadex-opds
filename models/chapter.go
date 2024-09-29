@@ -57,24 +57,24 @@ func (c *Chapter) FullTitle() string {
 		title = m.TrTitle()
 	}
 
-	builder.WriteString(LanguageToFlag[c.Attributes.TranslatedLanguage])
-	builder.WriteString(" ")
+	//builder.WriteString(LanguageToFlag[c.Attributes.TranslatedLanguage])
+	//builder.WriteString(" ")
 	builder.WriteString(title)
-	builder.WriteString(" - ")
+	//builder.WriteString(" - ")
 
-	if c.Attributes.Volume != "" {
-		builder.WriteString("[Vol. ")
-		builder.WriteString(c.Attributes.Volume)
-		builder.WriteString("]")
-	}
+	//if c.Attributes.Volume != "" {
+	//	builder.WriteString("[Vol. ")
+	//	builder.WriteString(c.Attributes.Volume)
+	//	builder.WriteString("]")
+	//}
 
 	builder.WriteString(" Chapter ")
 	builder.WriteString(cmp.Or(c.Attributes.Chapter, "Unknown"))
 
-	if c.Attributes.Title != "" {
-		builder.WriteString(" - ")
-		builder.WriteString(c.Attributes.Title)
-	}
+	//if c.Attributes.Title != "" {
+	//	builder.WriteString(" - ")
+	//	builder.WriteString(c.Attributes.Title)
+	//}
 
 	c.fullTitle = strings.TrimSpace(builder.String())
 	return c.fullTitle
