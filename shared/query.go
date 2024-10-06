@@ -26,7 +26,7 @@ var APIUrl = url.URL{
 // DevUrl is the MangaDex Dev API URL used in place of [APIUrl]
 var DevUrl = url.URL{
 	Scheme: "https",
-	Host:   "api.mangadex.dev",
+	Host:   "api.mangadex.org",
 }
 
 // UploadsURL is the MangaDex Uploads URL used when the MDUploads option is true
