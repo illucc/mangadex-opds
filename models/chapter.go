@@ -62,11 +62,11 @@ func (c *Chapter) FullTitle() string {
 	builder.WriteString(title)
 	//builder.WriteString(" - ")
 
-	//if c.Attributes.Volume != "" {
-	//	builder.WriteString("[Vol. ")
-	//	builder.WriteString(c.Attributes.Volume)
-	//	builder.WriteString("]")
-	//}
+	if c.Attributes.Volume != "" {
+		builder.WriteString("[Vol. ")
+		builder.WriteString(c.Attributes.Volume)
+		builder.WriteString("]")
+	}
 
 	builder.WriteString(" Chapter ")
 	builder.WriteString(cmp.Or(c.Attributes.Chapter, "Unknown"))
